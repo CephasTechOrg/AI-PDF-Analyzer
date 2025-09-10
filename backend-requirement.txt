@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+python-multipart    # file uploads
+pdfplumber          # PDF text extraction
+python-dotenv       # optional: load .env in dev

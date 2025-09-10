@@ -46,7 +46,7 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     # Read bytes from UploadFile (Starlette / FastAPI handles streaming for large files)
     content = await file.read()
-    # Save the raw PDF to disk (keeps the original; we can re-process later)
+    # Saves the raw PDF to disk (keeps the original; we can re-process later)
     with open(saved_path, "wb") as f:
         f.write(content)
 
@@ -62,7 +62,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         # If parsing fails, return a helpful message. We'll add OCR fallback later.
         raise HTTPException(status_code=500, detail=f"PDF parsing failed: {exc}")
 
-    # Persist a lightweight text preview (useful for quick checks during dev)
+    # Persist a lightweight text preview (useful for quick check during dev)
     preview_path = os.path.join(UPLOAD_DIR, f"{saved_filename}.txt")
     with open(preview_path, "w", encoding="utf-8") as pf:
         pf.write("\n\n".join(pages_text))

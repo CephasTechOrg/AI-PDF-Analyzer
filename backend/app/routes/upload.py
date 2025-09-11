@@ -1,7 +1,6 @@
-# backend/app/routes/upload.py
 """
 Routes for uploading files and retrieving extracted text.
-This file wires file_utils + pdf_service together.
+This file wires file_utils + pdf_service + docx_service together.
 """
 
 import os
@@ -9,6 +8,7 @@ import uuid
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.utils.file_utils import save_uploaded_file
 from app.services.pdf_service import extract_text_from_pdf
+from app.services.docx_service import extract_text_from_docx  # NEW
 
 router = APIRouter()
 
@@ -17,42 +17,51 @@ UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-@router.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
+@router.post("/upload-file")
+async def upload_file(file: UploadFile = File(...)):
     """
-    Upload a PDF, save it, extract text, and return metadata (file_id, pages_count).
+    Upload a PDF or DOCX, save it, extract text, and return metadata.
     - Validates the extension (simple check).
     - Uses async save helper to persist binary.
-    - Calls pdf_service to extract text and write preview file.
+    - Calls pdf_service or docx_service to extract text.
     """
-    # Basic validation: check extension (MIME check could be added later)
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    filename = file.filename.lower()
+    if not (filename.endswith(".pdf") or filename.endswith(".docx")):
+        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are allowed")
 
     # Generate stable file id (UUID)
     file_id = str(uuid.uuid4())
 
     # Persist the uploaded file and obtain paths
-    pdf_path, text_path = await save_uploaded_file(file, file_id, UPLOAD_DIR)
+    file_path, text_path = await save_uploaded_file(file, file_id, UPLOAD_DIR)
 
-    # Extract text (synchronous; if heavy, we can run in background in the future)
+    extracted_text = ""
+    pages_indexed = None
+
     try:
-        extracted_text, pages_indexed = extract_text_from_pdf(pdf_path, text_path)
+        if filename.endswith(".pdf"):
+            extracted_text, pages_indexed = extract_text_from_pdf(file_path, text_path)
+        elif filename.endswith(".docx"):
+            extracted_text = extract_text_from_docx(file_path)
+            # Save extracted text to preview file
+            with open(text_path, "w", encoding="utf-8") as f:
+                f.write(extracted_text)
+
     except Exception as exc:
-        # Keep error messages clean for the client
         raise HTTPException(status_code=500, detail=f"Text extraction failed: {exc}")
 
     return {
         "status": "ok",
         "file_id": file_id,
         "filename": file.filename,
+        "file_type": "pdf" if filename.endswith(".pdf") else "docx",
         "pages_indexed": pages_indexed,
-        "message": f"Saved to {pdf_path} (preview: {text_path})"
+        "message": f"Saved to {file_path} (preview: {text_path})"
     }
 
 
-@router.get("/pdf/{file_id}/text")
-async def get_pdf_text(file_id: str):
+@router.get("/file/{file_id}/text")
+async def get_file_text(file_id: str):
     """
     Return the full extracted text for a given file_id.
     The text file is named {file_id}.txt under UPLOAD_DIR.

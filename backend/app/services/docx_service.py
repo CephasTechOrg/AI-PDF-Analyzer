@@ -1,15 +1,27 @@
-import os
+"""
+Service for extracting text from DOCX files.
+This file parallels pdf_service.py but for Word documents.
+"""
+
 from docx import Document
 
-def extract_text_from_docx(file_path: str) -> str:
+
+def extract_text_from_docx(docx_path: str) -> str:
     """
-    Extract text from a Word (.docx) file.
+    Extract text from a DOCX file and return as a single string.
+    - Reads paragraphs in order.
+    - Joins them with newlines.
     """
     try:
-        doc = Document(file_path)
-        full_text = []
+        doc = Document(docx_path)
+        text_chunks = []
+
         for para in doc.paragraphs:
-            full_text.append(para.text)
-        return "\n".join(full_text).strip() or "⚠️ No extractable text found in DOCX."
+            if para.text.strip():  # ignore empty lines
+                text_chunks.append(para.text.strip())
+
+        extracted_text = "\n".join(text_chunks)
+        return extracted_text if extracted_text else "⚠️ No extractable text found in DOCX."
+
     except Exception as e:
-        raise RuntimeError(f"Error extracting DOCX: {e}")
+        raise RuntimeError(f"Failed to read DOCX: {e}")
